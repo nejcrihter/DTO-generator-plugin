@@ -2,14 +2,14 @@
 <idea-plugin>
     <depends>com.intellij.modules.java</depends>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>si.petrol.DTO-creator</id>
+    <id>DTO-generator</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
     <name>DTO Generator</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor email="nejc.rihter@petrol.si">Nejc Rihter</vendor>
+    <vendor email="nejcrihti@gmail.com">Nejc Rihter</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
@@ -33,7 +33,7 @@
     <actions>
         <group id="DTOGenerator.Action" text="DTO Generator" description="Generate DTOs from JPA entities">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first" />
-            <action id="DTOGenerator.GenerateDTO" class="si.petrol.dtogenerator.GenerateDtoAction" text="Generate DTOs" />
+            <action id="DTOGenerator.GenerateDTO" class="si.dtogenerator.GenerateDtoAction" text="Generate DTOs" />
         </group>
     </actions>
 </idea-plugin>

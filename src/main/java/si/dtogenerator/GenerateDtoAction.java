@@ -1,9 +1,4 @@
-package si.petrol.dtogenerator;
-/* created: 7. 08. 2023
- * by: Nejc Rihter mailto:nejc.rihter@petrol.si
- * for: PETROL d.d.
- */
-
+package si.dtogenerator;
 
 import com.intellij.ide.highlighter.JavaFileType;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -12,7 +7,6 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Objects;

@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.10.1"
 }
 
-group = "si.petrol"
+group = "si"
 version = "1.0-SNAPSHOT"
 
 repositories {
