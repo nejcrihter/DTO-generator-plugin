@@ -9,18 +9,16 @@
     <name>DTO Generator</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor email="nejcrihti@gmail.com">Nejc Rihter</vendor>
+    <vendor email="nejc.rihter@petrol.si">Nejc Rihter</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-        Plugin for generating DTOs from JPA entities.
+        Plugin for generating DTOs from JPA entities. <br>
 
         Disclaimer: This plugin doesn't work until all files have beed indexed.
   ]]></description>
-
-    <idea-version since-build="193.5233" until-build="203.*"/>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
