@@ -5,9 +5,15 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.project.ProjectUtil;
+import com.intellij.openapi.vfs.VfsUtilCore;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.openapi.project.Project;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -59,11 +65,15 @@ public class GenerateDtoAction extends AnAction {
 
     private boolean isJpaEntity(PsiClass psiClass) {
         if (psiClass == null) {
-            System.out.println("psiClass null");
+            System.out.println("psiClass is null");
             return false;
         }
         PsiAnnotation entityAnnotation = psiClass.getAnnotation("jakarta.persistence.Entity");
-        System.out.println("Class is JPA entity: " + entityAnnotation);
+        if (entityAnnotation == null) {
+            entityAnnotation = psiClass.getAnnotation("javax.persistence.Entity");
+        }
+
+        System.out.println("Is class JPA entity: " + entityAnnotation);
         return entityAnnotation != null;
     }
 
@@ -103,6 +113,9 @@ public class GenerateDtoAction extends AnAction {
                 boolean isNotNull = false;
 
                 PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
+                if (columnAnnotation == null) {
+                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
+                }
                 if (columnAnnotation != null) {
                     PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
                     if (nullableValue != null && "false".equals(nullableValue.getText())) {
@@ -165,6 +178,7 @@ public class GenerateDtoAction extends AnAction {
         // Import the annotations
         PsiJavaFile javaFile = (PsiJavaFile) newDTOClass.getContainingFile();
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
 
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
@@ -301,6 +315,10 @@ public class GenerateDtoAction extends AnAction {
                 boolean isNotNull = false;
 
                 PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
+                if (columnAnnotation == null) {
+                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
+                }
+
                 if (columnAnnotation != null) {
                     PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
                     if (nullableValue != null && "false".equals(nullableValue.getText())) {
@@ -364,6 +382,7 @@ public class GenerateDtoAction extends AnAction {
         // Import the annotations
         PsiJavaFile javaFile = (PsiJavaFile) putDTOClass.getContainingFile();
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
 
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
@@ -411,6 +430,10 @@ public class GenerateDtoAction extends AnAction {
                 boolean isNotNull = false;
 
                 PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
+                if (columnAnnotation == null) {
+                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
+                }
+
                 if (columnAnnotation != null) {
                     PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
                     if (nullableValue != null && "false".equals(nullableValue.getText())) {
@@ -473,7 +496,8 @@ public class GenerateDtoAction extends AnAction {
 
         // Import the annotations
         PsiJavaFile javaFile = (PsiJavaFile) returnDtoClass.getContainingFile();
-        javaFile.getImportList().add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
 
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
@@ -527,22 +551,25 @@ public class GenerateDtoAction extends AnAction {
             // Check if the parent directory has a subdirectory named "mapper"
             PsiDirectory mapperDirectory = null;
             if (parentDirectory != null) {
-                mapperDirectory = parentDirectory.findSubdirectory("mapper");
+                mapperDirectory = parentDirectory.findSubdirectory("mapping");
                 if (mapperDirectory == null) {
-                    mapperDirectory = parentDirectory.createSubdirectory("mapper");
+                    mapperDirectory = parentDirectory.createSubdirectory("mapping");
                 }
             }
 
             String mapperName = entityClass.getName() + "Mapper";
             PsiFile existingMapper = mapperDirectory.findFile(mapperName + ".java");
-            String mappingMethods ="    " + dtoClass.getName() + " to" + dtoClass.getName() + "(" + entityClass.getName() + " " + Objects.requireNonNull(lowercaseFirstLetter(entityClass.getName())) + ");\n" +
+            String mappingMethods = "    " + dtoClass.getName() + " to" + dtoClass.getName() + "(" + entityClass.getName() + " " + Objects.requireNonNull(lowercaseFirstLetter(entityClass.getName())) + ");\n" +
                     "    List<" + dtoClass.getName() + ">" + " to" + dtoClass.getName() + "(List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ");\n";
+
+            boolean isQuarkus2 = isQuarkus2Project(entityClass.getProject());
+            String componentModel = isQuarkus2 ? "cdi" : "jakarta";
 
             if (existingMapper == null) {
                 String mapperText = "import org.mapstruct.Mapper;\n" +
                         "import org.mapstruct.Mapping;\n" +
                         "import org.mapstruct.factory.Mappers;\n\n" +
-                        "@Mapper(componentModel = \"jakarta\")\n" +
+                        "@Mapper(componentModel = \"" + componentModel + "\")\n" +
                         "public interface " + mapperName + " {\n" +
                         mappingMethods +
                         "}";
@@ -579,29 +606,56 @@ public class GenerateDtoAction extends AnAction {
         });
     }
 
-
-    // Helper method to determine if a field represents a foreign key
-    private boolean isForeignKey(PsiField field) {
-        // This is a basic check based on JPA annotations. Adjust as needed for your project.
-        return Arrays.stream(field.getAnnotations())
-                .anyMatch(annotation -> annotation.getQualifiedName().equals("jakarta.persistence.ManyToOne") ||
-                        annotation.getQualifiedName().equals("jakarta.persistence.OneToOne"));
-    }
-
-
-    private boolean hasJpaAnnotations(PsiField field) {
-        String[] jpaAnnotations = {"jakarta.persistence.Id", "jakarta.persistence.Column",
-                "jakarta.persistence.ManyToOne", "jakarta.persistence.OneToMany",
-                "jakarta.persistence.ManyToMany", "jakarta.persistence.OneToOne"};
-        for (PsiAnnotation annotation : field.getAnnotations()) {
-            String annotationQualifiedName = annotation.getQualifiedName();
-            for (String jpaAnnotation : jpaAnnotations) {
-                if (jpaAnnotation.equals(annotationQualifiedName)) {
-                    return true;
+    private boolean isQuarkus2Project(Project project) {
+        VirtualFile baseDir = ProjectUtil.guessProjectDir(project);
+        if (baseDir != null) {
+            VirtualFile pomFile = baseDir.findChild("pom.xml");
+            if (pomFile != null) {
+                try {
+                    String pomContent = VfsUtilCore.loadText(pomFile);
+                    Pattern pattern = Pattern.compile("<quarkus\\.platform\\.version>(.*?)</quarkus\\.platform\\.version>");
+                    Matcher matcher = pattern.matcher(pomContent);
+                    if (matcher.find()) {
+                        String quarkusVersion = matcher.group(1);
+                        return quarkusVersion.startsWith("2.");
+                    }
+                } catch (Exception e) {
+                    // Handle any exceptions that might occur while reading the pom.xml
+                    e.printStackTrace();
                 }
             }
         }
         return false;
     }
-}
+
+
+        // Helper method to determine if a field represents a foreign key
+        private boolean isForeignKey (PsiField field){
+            // This is a basic check based on JPA annotations. Adjust as needed for your project.
+            return Arrays.stream(field.getAnnotations())
+                    .anyMatch(annotation -> annotation.getQualifiedName().equals("jakarta.persistence.ManyToOne") ||
+                            annotation.getQualifiedName().equals("jakarta.persistence.OneToOne") ||
+                            annotation.getQualifiedName().equals("javax.persistence.ManyToOne") ||
+                            annotation.getQualifiedName().equals("javax.persistence.OneToOne"));
+        }
+
+
+        private boolean hasJpaAnnotations (PsiField field){
+            String[] jpaAnnotations = {"jakarta.persistence.Id", "jakarta.persistence.Column",
+                    "jakarta.persistence.ManyToOne", "jakarta.persistence.OneToMany",
+                    "jakarta.persistence.ManyToMany", "jakarta.persistence.OneToOne",
+                    "javax.persistence.Id", "javax.persistence.Column",
+                    "javax.persistence.ManyToOne", "javax.persistence.OneToMany",
+                    "javax.persistence.ManyToMany", "javax.persistence.OneToOne"};
+            for (PsiAnnotation annotation : field.getAnnotations()) {
+                String annotationQualifiedName = annotation.getQualifiedName();
+                for (String jpaAnnotation : jpaAnnotations) {
+                    if (jpaAnnotation.equals(annotationQualifiedName)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
 
