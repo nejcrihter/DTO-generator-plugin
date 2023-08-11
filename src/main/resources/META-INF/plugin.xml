@@ -40,9 +40,8 @@
         <p>Disclaimer: This plugin is made for Quarkus projects and is not tested on other frameworks.</p>
         <p>Disclaimer 2: You need to wait for Intellij to index all files before trying to generate DTO and mapper.</p>
 
-  ]]></description>
 
-    <idea-version since-build="193.5233" until-build="203.*"/>
+  ]]></description>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
