@@ -443,7 +443,7 @@ public class GenerateDtoAction extends AnAction {
 
                 if (isForeignKey(field)) {
                     fieldType = factory.createTypeByFQClassName(field.getType().getPresentableText() + "ReturnDTO", entityClass.getResolveScope());
-                    fieldName = field.getName() + "ReturnDTO";
+                    fieldName = field.getName();
                 } else {
                     fieldType = field.getType();
                     fieldName = field.getName();
