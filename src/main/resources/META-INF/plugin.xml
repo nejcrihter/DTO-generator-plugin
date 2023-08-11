@@ -2,11 +2,11 @@
 <idea-plugin>
     <depends>com.intellij.modules.java</depends>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>DTO-generator</id>
+    <id>DTO-mapper-generator</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
-    <name>DTO Generator</name>
+    <name>JPA to DTO and MapStruct Mapper Generator</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor email="nejc.rihter@petrol.si">Nejc Rihter</vendor>
@@ -15,9 +15,32 @@
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-        Plugin for generating DTOs from JPA entities. <br>
+        <h1>IntelliJ Plugin: JPA Entity to DTO & MapStruct Mapper Generator</h1>
 
-        Disclaimer: This plugin doesn't work until all files have beed indexed.
+        <p><span>Description:</span></p>
+        <p>The "JPA to DTO & MapStruct Mapper Generator" is an IntelliJ IDEA plugin designed to streamline the development process for Java developers working with JPA (Java Persistence API) entities. With just a few clicks, this plugin can automatically generate Data Transfer Objects (DTOs) and the corresponding MapStruct mappers for any given JPA entity. This not only reduces the boilerplate code but also ensures consistency and adherence to best practices.</p>
+
+        <p><span>Key Features:</span></p>
+        <ul>
+            <li>Auto-Generate DTOs: For any selected JPA entity, the plugin will create a corresponding DTO with fields that mirror the entity's attributes.</li>
+            <li>MapStruct Mapper Generation: Along with the DTO, the plugin will generate a MapStruct mapper interface that provides methods to map between the JPA entity and its corresponding DTO.</li>
+            <li>Annotation Support: The generated DTOs and mappers will include necessary annotations, ensuring seamless integration with frameworks like Spring Boot.</li>
+            <li>Intuitive UI: The plugin provides an easy-to-use interface integrated into IntelliJ IDEA, allowing developers to select entities.</li>
+        </ul>
+
+        <p><span>Use Case:</span></p>
+        <p>Imagine a scenario where a developer is working on a large project with numerous JPA entities. Manually creating DTOs and mappers for each entity can be time-consuming and error-prone. With this plugin, the developer can automate this process, ensuring rapid development, consistency, and reduced chances of manual errors.</p>
+
+        <p><span>Installation:</span></p>
+        <p>The plugin can be installed directly from the IntelliJ IDEA plugins marketplace. Once installed, developers can access the generator via the context menu on any JPA entity.</p>
+
+        <p><span>Conclusion:</span></p>
+        <p>The "JPA to DTO & MapStruct Mapper Generator" plugin is an essential tool for Java developers working with JPA entities, offering a seamless way to generate DTOs and mappers, thus accelerating the development process and ensuring code quality.</p>
+
+        <p>Disclaimer: This plugin is made for Quarkus projects and is not tested on other frameworks.</p>
+        <p>Disclaimer 2: You need to wait for Intellij to index all files before trying to generate DTO and mapper.</p>
+
+
   ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -30,8 +53,8 @@
     </extensions>
     <actions>
         <group id="DTOGenerator.Action" text="DTO Generator" description="Generate DTOs from JPA entities">
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="first" />
-            <action id="DTOGenerator.GenerateDTO" class="si.dtogenerator.GenerateDtoAction" text="Generate DTOs" />
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+            <action id="DTOGenerator.GenerateDTO" class="si.dtogenerator.GenerateDtoAction" text="Generate DTOs"/>
         </group>
     </actions>
 </idea-plugin>
