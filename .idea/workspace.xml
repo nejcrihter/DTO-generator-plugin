@@ -7,7 +7,6 @@
     <list default="true" id="1bcf9462-f5e7-4f4f-a426-9096261c625f" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/si/dtogenerator/GenerateDtoAction.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/si/dtogenerator/GenerateDtoAction.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -114,7 +113,7 @@
       <workItem from="1691576634848" duration="1011000" />
       <workItem from="1691752446527" duration="238000" />
       <workItem from="1691752720906" duration="600000" />
-      <workItem from="1692161826752" duration="1034000" />
+      <workItem from="1692161826752" duration="2125000" />
     </task>
     <servers />
   </component>
