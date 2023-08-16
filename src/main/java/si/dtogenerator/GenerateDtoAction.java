@@ -559,8 +559,8 @@ public class GenerateDtoAction extends AnAction {
 
             String mapperName = entityClass.getName() + "Mapper";
             PsiFile existingMapper = mapperDirectory.findFile(mapperName + ".java");
-            String mappingMethods = "    " + dtoClass.getName() + " to" + dtoClass.getName() + "(" + entityClass.getName() + " " + Objects.requireNonNull(lowercaseFirstLetter(entityClass.getName())) + ");\n" +
-                    "    List<" + dtoClass.getName() + ">" + " to" + dtoClass.getName() + "(List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ");\n";
+            String mappingMethods = "    " +  entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n" +
+                    "    List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");";
 
             boolean isQuarkus2 = isQuarkus2Project(entityClass.getProject());
             String componentModel = isQuarkus2 ? "cdi" : "jakarta";
@@ -588,13 +588,17 @@ public class GenerateDtoAction extends AnAction {
 
                     if (Objects.requireNonNull(dtoClass.getName()).contains("UpdateDTO")) {
                         method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)"
-                                + dtoClass.getName() + " from" + dtoClass.getName() + "(@MappingTarget " + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
+                                + entityClass.getName() + " from" + dtoClass.getName() + "(@MappingTarget " + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                         method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)" +
-                                "List<" + dtoClass.getName() + ">" + " to" + dtoClass.getName() + "(@MappingTarget  List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
-                    } else {
+                                "List<" + entityClass.getName() + ">" + " to" + dtoClass.getName() + "(@MappingTarget  List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
+                    } else if (Objects.requireNonNull(dtoClass.getName()).contains("ReturnDTO")) {
                         method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText(dtoClass.getName() + " to" + dtoClass.getName() + "(" + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ");", existingMapperClass);
                         method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("List<" + dtoClass.getName() + ">" + " to" + dtoClass.getName() + "(List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ");", existingMapperClass);
+                    } else {
+                        method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText(entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
+                        method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                     }
+
                     existingMapperClass.add(method1);
                     existingMapperClass.add(method2);
 
