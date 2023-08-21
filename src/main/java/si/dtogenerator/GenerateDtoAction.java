@@ -387,11 +387,6 @@ public class GenerateDtoAction extends AnAction {
 
             if (existingMapper == null) {
                 String mapperText = "import org.mapstruct.*;\n" +
-                        "import si.petrol.entity." + entityClass.getName() + ";\n" +
-                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "PutDTO;" +
-                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "ReturnDTO;" +
-                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "UpdateDTO;" +
-                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + ".New" + entityClass.getName() + "DTO;" +
                         "import java.util.List;" +
                         "@Mapper(componentModel = \"" + componentModel + "\")\n" +
                         "public interface " + mapperName + " {\n" +
