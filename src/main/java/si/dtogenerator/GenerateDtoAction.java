@@ -34,6 +34,7 @@ public class GenerateDtoAction extends AnAction {
             generateReturnDtoForEntity(selectedClass);
             generatePutDtoForEntity(selectedClass);
             generateUpdateDtoForEntity(selectedClass);
+            generateBP(selectedClass);
         }
     }
 
@@ -78,346 +79,42 @@ public class GenerateDtoAction extends AnAction {
     }
 
     private void generateNewDtoForEntity(PsiClass entityClass) {
-        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
-
-        // Create ReturnDTO class name
-        String newDTOClassName = "New" + entityClass.getName() + "DTO";
-
-        PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
-
-        //Get the service.classname directory
-        PsiDirectory classDirectory = getClassDirectory(entityClass, directory);
-
-        // Check if ReturnDTO class already exists
-        PsiFile existingFile = classDirectory.findFile(newDTOClassName + ".java");
-        if (existingFile != null) {
-            System.out.println("NewDTO class already exists: " + newDTOClassName);
-            return; // Exit the method if ReturnDTO class already exists
-        }
-
-        // Create ReturnDTO class
-        PsiClass newDTOClass = factory.createClass(newDTOClassName);
-
-        // Create a default constructor for ReturnDTO class
-        PsiMethod defaultConstructor = factory.createConstructor();
-        newDTOClass.add(defaultConstructor);
-
-        // Create a StringBuilder to hold the constructor parameters and body
-        StringBuilder constructorParams = new StringBuilder();
-        StringBuilder constructorBody = new StringBuilder();
-
-        for (PsiField field : entityClass.getFields()) {
-            if (hasJpaAnnotations(field)) {
-                PsiType fieldType;
-                String fieldName;
-                boolean isNotNull = false;
-
-                PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
-                if (columnAnnotation == null) {
-                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
-                }
-                if (columnAnnotation != null) {
-                    PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
-                    if (nullableValue != null && "false".equals(nullableValue.getText())) {
-                        isNotNull = true;
-                    }
-                }
-
-                if (isForeignKey(field)) {
-                    fieldType = factory.createTypeByFQClassName("java.lang.String", entityClass.getResolveScope());
-                    fieldName = field.getName() + "Id";
-                } else {
-                    fieldType = field.getType();
-                    fieldName = field.getName();
-                }
-
-                // Add field to ReturnDTO class with annotations
-                PsiField newField = factory.createField(fieldName, fieldType);
-
-                if (isNotNull) {
-                    if (fieldType.getCanonicalText().equals("java.lang.String")) {
-                        Objects.requireNonNull(newField.getModifierList()).addAnnotation("NotBlank");
-                    } else {
-                        Objects.requireNonNull(newField.getModifierList()).addAnnotation("NotNull");
-                    }
-                }
-                newDTOClass.add(newField);
-
-                // Add parameter to constructor
-                if (constructorParams.length() > 0) {
-                    constructorParams.append(", ");
-                }
-                constructorParams.append(fieldType.getPresentableText()).append(" ").append(fieldName);
-
-                // Add assignment to constructor body
-                constructorBody.append("this.").append(fieldName).append(" = ").append(fieldName).append("; ");
-
-                // Add getter for the field
-                PsiMethod getter = factory.createMethodFromText(
-                        "public " + fieldType.getPresentableText() + " get" +
-                                Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "() { return " + fieldName + "; }", newDTOClass);
-                newDTOClass.add(getter);
-
-                // Add setter for the field
-                PsiMethod setter = factory.createMethodFromText(
-                        "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
-                                fieldName + " = " + fieldName + "; }", newDTOClass);
-                newDTOClass.add(setter);
-            }
-        }
-
-        // Create and add constructor with parameters to DTO class
-        PsiMethod constructor = factory.createMethodFromText(
-                "public " + newDTOClass.getName() + "(" + constructorParams.toString() + ") { " +
-                        constructorBody.toString() +
-                        " }", newDTOClass);
-        newDTOClass.add(constructor);
-
-        // Import the annotations
-        PsiJavaFile javaFile = (PsiJavaFile) newDTOClass.getContainingFile();
-        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
-        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
-
-        // Use WriteCommandAction to make modifications
-        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
-            // Add ReturnDTO class to the same directory as the entity
-            classDirectory.add(newDTOClass);
-        });
-
-        // Create mapper directory and MapStruct mapper
-        createMapperForEntity(entityClass, newDTOClass);
-
+        generateDTO(entityClass, "New" + entityClass.getName() + "DTO", false, false);
     }
 
     private void generateUpdateDtoForEntity(PsiClass entityClass) {
-        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
-
-        // Create ReturnDTO class name
-        String updateDTOClassName = entityClass.getName() + "UpdateDTO";
-
-        PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
-
-        //Get the service.classname directory
-        PsiDirectory classDirectory = getClassDirectory(entityClass, directory);
-
-        // Check if ReturnDTO class already exists
-        PsiFile existingFile = classDirectory.findFile(updateDTOClassName + ".java");
-        if (existingFile != null) {
-            System.out.println("UpdateDTO class already exists: " + updateDTOClassName);
-            return; // Exit the method if ReturnDTO class already exists
-        }
-
-        // Create ReturnDTO class
-        PsiClass updateDTOClass = factory.createClass(updateDTOClassName);
-
-        // Create a default constructor for ReturnDTO class
-        PsiMethod defaultConstructor = factory.createConstructor();
-        updateDTOClass.add(defaultConstructor);
-
-        // Create a StringBuilder to hold the constructor parameters and body
-        StringBuilder constructorParams = new StringBuilder();
-        StringBuilder constructorBody = new StringBuilder();
-
-        for (PsiField field : entityClass.getFields()) {
-            if (hasJpaAnnotations(field)) {
-                PsiType fieldType;
-                String fieldName;
-
-                if (isForeignKey(field)) {
-                    fieldType = factory.createTypeByFQClassName("java.lang.String", entityClass.getResolveScope());
-                    fieldName = field.getName() + "Id";
-                } else {
-                    fieldType = field.getType();
-                    fieldName = field.getName();
-                }
-                // Add field to ReturnDTO class with annotations
-                PsiField newField = factory.createField(fieldName, fieldType);
-                updateDTOClass.add(newField);
-
-                // Add parameter to constructor
-                if (constructorParams.length() > 0) {
-                    constructorParams.append(", ");
-                }
-                constructorParams.append(fieldType.getPresentableText()).append(" ").append(fieldName);
-
-                // Add assignment to constructor body
-                constructorBody.append("this.").append(fieldName).append(" = ").append(fieldName).append("; ");
-
-                // Add getter for the field
-                PsiMethod getter = factory.createMethodFromText(
-                        "public " + fieldType.getPresentableText() + " get" +
-                                Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "() { return " + fieldName + "; }", updateDTOClass);
-                updateDTOClass.add(getter);
-
-                // Add setter for the field
-                PsiMethod setter = factory.createMethodFromText(
-                        "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
-                                fieldName + " = " + fieldName + "; }", updateDTOClass);
-                updateDTOClass.add(setter);
-            }
-        }
-
-        // Create and add constructor with parameters to DTO class
-        PsiMethod constructor = factory.createMethodFromText(
-                "public " + updateDTOClass.getName() + "(" + constructorParams.toString() + ") { " +
-                        constructorBody.toString() +
-                        " }", updateDTOClass);
-        updateDTOClass.add(constructor);
-
-        // Use WriteCommandAction to make modifications
-        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
-            // Add ReturnDTO class to the same directory as the entity
-            classDirectory.add(updateDTOClass);
-        });
-
-        // Create mapper directory and MapStruct mapper
-        createMapperForEntity(entityClass, updateDTOClass);
+        generateDTO(entityClass, entityClass.getName() + "UpdateDTO", false, true);
     }
 
     private void generatePutDtoForEntity(PsiClass entityClass) {
-        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
-
-        // Create ReturnDTO class name
-        String putDTOClassName = entityClass.getName() + "PutDTO";
-
-        PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
-
-        //Get the service.classname directory
-        PsiDirectory classDirectory = getClassDirectory(entityClass, directory);
-
-        // Check if ReturnDTO class already exists
-        PsiFile existingFile = classDirectory.findFile(putDTOClassName + ".java");
-        if (existingFile != null) {
-            System.out.println("PutDTO class already exists: " + putDTOClassName);
-            return; // Exit the method if ReturnDTO class already exists
-        }
-
-        // Create ReturnDTO class
-        PsiClass putDTOClass = factory.createClass(putDTOClassName);
-
-
-        // Create a default constructor for ReturnDTO class
-        PsiMethod defaultConstructor = factory.createConstructor();
-        putDTOClass.add(defaultConstructor);
-
-        // Create a StringBuilder to hold the constructor parameters and body
-        StringBuilder constructorParams = new StringBuilder();
-        StringBuilder constructorBody = new StringBuilder();
-
-        for (PsiField field : entityClass.getFields()) {
-            if (hasJpaAnnotations(field)) {
-                PsiType fieldType;
-                String fieldName;
-                boolean isNotNull = false;
-
-                PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
-                if (columnAnnotation == null) {
-                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
-                }
-
-                if (columnAnnotation != null) {
-                    PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
-                    if (nullableValue != null && "false".equals(nullableValue.getText())) {
-                        isNotNull = true;
-                    }
-                }
-
-                if (isForeignKey(field)) {
-                    fieldType = factory.createTypeByFQClassName("java.lang.String", entityClass.getResolveScope());
-                    fieldName = field.getName() + "Id";
-                } else {
-                    fieldType = field.getType();
-                    fieldName = field.getName();
-                }
-
-                // Add field to ReturnDTO class with annotations
-                PsiField newField = factory.createField(fieldName, fieldType);
-
-                if (isNotNull) {
-                    if (fieldType.getCanonicalText().equals("java.lang.String")) {
-                        Objects.requireNonNull(newField.getModifierList()).addAnnotation("NotBlank");
-                    } else {
-                        Objects.requireNonNull(newField.getModifierList()).addAnnotation("NotNull");
-                    }
-                }
-                putDTOClass.add(newField);
-
-                // Add parameter to constructor
-                if (constructorParams.length() > 0) {
-                    constructorParams.append(", ");
-                }
-                constructorParams.append(fieldType.getPresentableText()).append(" ").append(fieldName);
-
-                // Add assignment to constructor body
-                constructorBody.append("this.").append(fieldName).append(" = ").append(fieldName).append("; ");
-
-                // Add getter for the field
-                PsiMethod getter = factory.createMethodFromText(
-                        "public " + fieldType.getPresentableText() + " get" +
-                                Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "() { return " + fieldName + "; }", putDTOClass);
-                putDTOClass.add(getter);
-
-                // Add setter for the field
-                PsiMethod setter = factory.createMethodFromText(
-                        "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
-                                fieldName + " = " + fieldName + "; }", putDTOClass);
-                putDTOClass.add(setter);
-            }
-        }
-
-        // Create and add constructor with parameters to DTO class
-        PsiMethod constructor = factory.createMethodFromText(
-                "public " + putDTOClass.getName() + "(" + constructorParams.toString() + ") { " +
-                        constructorBody.toString() +
-                        " }", putDTOClass);
-        putDTOClass.add(constructor);
-
-
-        // Import the annotations
-        PsiJavaFile javaFile = (PsiJavaFile) putDTOClass.getContainingFile();
-        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
-        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
-
-        // Use WriteCommandAction to make modifications
-        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
-            // Add ReturnDTO class to the same directory as the entity
-            classDirectory.add(putDTOClass);
-        });
-
-        // Create mapper directory and MapStruct mapper
-        createMapperForEntity(entityClass, putDTOClass);
+        generateDTO(entityClass, entityClass.getName() + "PutDTO", false, false);
     }
 
     private void generateReturnDtoForEntity(PsiClass entityClass) {
-        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
+        generateDTO(entityClass, entityClass.getName() + "ReturnDTO", true, false);
+    }
 
-        // Create ReturnDTO class name
-        String returnDtoClassName = entityClass.getName() + "ReturnDTO";
+    private void generateDTO(PsiClass entityClass, String className, boolean isReturn, boolean isUpdate) {
+        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
 
         PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
 
         //Get the service.classname directory
         PsiDirectory classDirectory = getClassDirectory(entityClass, directory);
 
-        // Check if ReturnDTO class already exists
-        PsiFile existingFile = classDirectory.findFile(returnDtoClassName + ".java");
+        // Check if DTO class already exists
+        PsiFile existingFile = classDirectory.findFile(className + ".java");
         if (existingFile != null) {
-            System.out.println("ReturnDTO class already exists: " + returnDtoClassName);
-            return; // Exit the method if ReturnDTO class already exists
+            System.out.println(className + " already exists");
+            return; // Exit the method if DTO class already exists
         }
 
-        // Create ReturnDTO class
-        PsiClass returnDtoClass = factory.createClass(returnDtoClassName);
+        // Create DTO class
+        PsiClass DTOClass = factory.createClass(className);
 
         // Create a default constructor for ReturnDTO class
         PsiMethod defaultConstructor = factory.createConstructor();
-        returnDtoClass.add(defaultConstructor);
+        DTOClass.add(defaultConstructor);
 
         // Create a StringBuilder to hold the constructor parameters and body
         StringBuilder constructorParams = new StringBuilder();
@@ -429,27 +126,33 @@ public class GenerateDtoAction extends AnAction {
                 String fieldName;
                 boolean isNotNull = false;
 
-                PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
-                if (columnAnnotation == null) {
-                    columnAnnotation = field.getAnnotation("javax.persistence.Column");
-                }
-
-                if (columnAnnotation != null) {
-                    PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
-                    if (nullableValue != null && "false".equals(nullableValue.getText())) {
-                        isNotNull = true;
+                if (isUpdate) {
+                    PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
+                    if (columnAnnotation == null) {
+                        columnAnnotation = field.getAnnotation("javax.persistence.Column");
+                    }
+                    if (columnAnnotation != null) {
+                        PsiAnnotationMemberValue nullableValue = columnAnnotation.findAttributeValue("nullable");
+                        if (nullableValue != null && "false".equals(nullableValue.getText())) {
+                            isNotNull = true;
+                        }
                     }
                 }
 
                 if (isForeignKey(field)) {
-                    fieldType = factory.createTypeByFQClassName(field.getType().getPresentableText() + "ReturnDTO", entityClass.getResolveScope());
-                    fieldName = field.getName();
+                    if (isReturn) {
+                        fieldType = factory.createTypeByFQClassName(field.getType().getPresentableText() + "ReturnDTO", entityClass.getResolveScope());
+                        fieldName = field.getName();
+                    } else {
+                        fieldType = factory.createTypeByFQClassName("java.lang.String", entityClass.getResolveScope());
+                        fieldName = field.getName() + "Id";
+                    }
                 } else {
                     fieldType = field.getType();
                     fieldName = field.getName();
                 }
 
-                // Add field to ReturnDTO class with annotations
+                // Add field to DTO class with annotations
                 PsiField newField = factory.createField(fieldName, fieldType);
 
                 if (isNotNull) {
@@ -459,7 +162,7 @@ public class GenerateDtoAction extends AnAction {
                         newField.getModifierList().addAnnotation("NotNull");
                     }
                 }
-                returnDtoClass.add(newField);
+                DTOClass.add(newField);
 
                 // Add parameter to constructor
                 if (constructorParams.length() > 0) {
@@ -475,37 +178,133 @@ public class GenerateDtoAction extends AnAction {
                 PsiMethod getter = factory.createMethodFromText(
                         "public " + fieldType.getPresentableText() + " get" +
                                 Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "() { return " + fieldName + "; }", returnDtoClass);
-                returnDtoClass.add(getter);
+                                "() { return " + fieldName + "; }", DTOClass);
+                DTOClass.add(getter);
 
                 // Add setter for the field
                 PsiMethod setter = factory.createMethodFromText(
                         "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
                                 "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
-                                fieldName + " = " + fieldName + "; }", returnDtoClass);
-                returnDtoClass.add(setter);
+                                fieldName + " = " + fieldName + "; }", DTOClass);
+                DTOClass.add(setter);
             }
         }
 
         // Create and add constructor with parameters to DTO class
         PsiMethod constructor = factory.createMethodFromText(
-                "public " + returnDtoClass.getName() + "(" + constructorParams.toString() + ") { " +
+                "public " + DTOClass.getName() + "(" + constructorParams.toString() + ") { " +
                         constructorBody.toString() +
-                        " }", returnDtoClass);
-        returnDtoClass.add(constructor);
+                        " }", DTOClass);
+        DTOClass.add(constructor);
 
         // Import the annotations
-        PsiJavaFile javaFile = (PsiJavaFile) returnDtoClass.getContainingFile();
+        PsiJavaFile javaFile = (PsiJavaFile) DTOClass.getContainingFile();
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
 
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
             // Add ReturnDTO class to the same directory as the entity
-            classDirectory.add(returnDtoClass);
+            classDirectory.add(DTOClass);
         });
         // Create mapper directory and MapStruct mapper
-        createMapperForEntity(entityClass, returnDtoClass);
+        createMapperForEntity(entityClass, DTOClass);
+    }
+
+    private void generateBP(PsiClass entityClass) {
+        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
+
+        PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
+
+        //Get the service.classname directory
+        PsiDirectory classDirectory = getBPClassDirectory(entityClass, directory);
+
+        String className = entityClass.getName() + "BP";
+
+        // Check if DTO class already exists
+        PsiFile existingFile = classDirectory.findFile(className + ".java");
+        if (existingFile != null) {
+            System.out.println(className + " already exists");
+            return; // Exit the method if DTO class already exists
+        }
+
+        // Create DTO class
+        PsiClass DTOClass = factory.createClass(className);
+
+        // Create a default constructor for ReturnDTO class
+        PsiMethod defaultConstructor = factory.createConstructor();
+        DTOClass.add(defaultConstructor);
+
+        // Create a StringBuilder to hold the constructor parameters and body
+        StringBuilder constructorParams = new StringBuilder();
+        StringBuilder constructorBody = new StringBuilder();
+
+        for (PsiField field : entityClass.getFields()) {
+            if (hasJpaAnnotations(field)) {
+                PsiType fieldType;
+                String fieldName;
+
+                if (isForeignKey(field)) {
+                    fieldType = factory.createTypeByFQClassName("java.lang.String", entityClass.getResolveScope());
+                    fieldName = field.getName() + "Id";
+
+                } else {
+                    fieldType = field.getType();
+                    fieldName = field.getName();
+                }
+
+                // Add field to DTO class with annotations
+                PsiField newField = factory.createField(fieldName, fieldType);
+
+                newField.getModifierList().addAnnotation("QueryParam(\"" + fieldName + "\")");
+
+                DTOClass.add(newField);
+
+                // Add parameter to constructor
+                if (constructorParams.length() > 0) {
+                    constructorParams.append(", ");
+                }
+                constructorParams.append(fieldType.getPresentableText()).append(" ").append(fieldName);
+
+                // Add assignment to constructor body
+                constructorBody.append("this.").append(fieldName).append(" = ").append(fieldName).append("; ");
+
+
+                // Add getter for the field
+                PsiMethod getter = factory.createMethodFromText(
+                        "public " + fieldType.getPresentableText() + " get" +
+                                Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
+                                "() { return " + fieldName + "; }", DTOClass);
+                DTOClass.add(getter);
+
+                // Add setter for the field
+                PsiMethod setter = factory.createMethodFromText(
+                        "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
+                                "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
+                                fieldName + " = " + fieldName + "; }", DTOClass);
+                DTOClass.add(setter);
+            }
+        }
+
+        // Create and add constructor with parameters to DTO class
+        PsiMethod constructor = factory.createMethodFromText(
+                "public " + DTOClass.getName() + "(" + constructorParams.toString() + ") { " +
+                        constructorBody.toString() +
+                        " }", DTOClass);
+        DTOClass.add(constructor);
+
+        // Import the annotations
+        PsiJavaFile javaFile = (PsiJavaFile) DTOClass.getContainingFile();
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.ws.rs"));
+        Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.ws.rs"));
+
+        // Use WriteCommandAction to make modifications
+        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
+            // Add ReturnDTO class to the same directory as the entity
+            classDirectory.add(DTOClass);
+        });
+        // Create mapper directory and MapStruct mapper
+        createMapperForEntity(entityClass, DTOClass);
     }
 
     private static PsiDirectory getClassDirectory(PsiClass entityClass, PsiDirectory directory) {
@@ -526,6 +325,27 @@ public class GenerateDtoAction extends AnAction {
                 if (classDirectory[0] == null) {
                     classDirectory[0] = serviceDirectory.createSubdirectory(Objects.requireNonNull(lowercaseFirstLetter(entityClass.getName())));
                 }
+            }
+        });
+
+        return classDirectory[0];
+    }
+
+    private static PsiDirectory getBPClassDirectory(PsiClass entityClass, PsiDirectory directory) {
+        // Get the parent directory
+        PsiDirectory parentDirectory = directory.getParent();
+
+        // Declare classDirectory outside the lambda
+        final PsiDirectory[] classDirectory = new PsiDirectory[1];
+
+        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
+            // Check if the parent directory has a subdirectory named service.classname
+            if (parentDirectory != null) {
+                PsiDirectory serviceDirectory = parentDirectory.findSubdirectory("beanParams");
+                if (serviceDirectory == null) {
+                    serviceDirectory = parentDirectory.createSubdirectory("beanParams");
+                }
+                classDirectory[0] = serviceDirectory;
             }
         });
 
@@ -559,16 +379,20 @@ public class GenerateDtoAction extends AnAction {
 
             String mapperName = entityClass.getName() + "Mapper";
             PsiFile existingMapper = mapperDirectory.findFile(mapperName + ".java");
-            String mappingMethods = "    " +  entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n" +
+            String mappingMethods = "    " + entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n" +
                     "    List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");";
 
             boolean isQuarkus2 = isQuarkus2Project(entityClass.getProject());
             String componentModel = isQuarkus2 ? "cdi" : "jakarta";
 
             if (existingMapper == null) {
-                String mapperText = "import org.mapstruct.Mapper;\n" +
-                        "import org.mapstruct.Mapping;\n" +
-                        "import org.mapstruct.factory.Mappers;\n\n" +
+                String mapperText = "import org.mapstruct.*;\n" +
+                        "import si.petrol.entity." + entityClass.getName() + ";\n" +
+                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "PutDTO;" +
+                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "ReturnDTO;" +
+                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + "." + entityClass.getName() + "UpdateDTO;" +
+                        "import si.petrol.service." + lowercaseFirstLetter(entityClass.getName()) + ".New" + entityClass.getName() + "DTO;" +
+                        "import java.util.List;" +
                         "@Mapper(componentModel = \"" + componentModel + "\")\n" +
                         "public interface " + mapperName + " {\n" +
                         mappingMethods +
@@ -590,10 +414,13 @@ public class GenerateDtoAction extends AnAction {
                         method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)"
                                 + entityClass.getName() + " from" + dtoClass.getName() + "(@MappingTarget " + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                         method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)" +
-                                "List<" + entityClass.getName() + ">" + " to" + dtoClass.getName() + "(@MappingTarget  List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
+                                "List<" + entityClass.getName() + ">" + " to" + dtoClass.getName() + "(@MappingTarget  List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ", List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                     } else if (Objects.requireNonNull(dtoClass.getName()).contains("ReturnDTO")) {
                         method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText(dtoClass.getName() + " to" + dtoClass.getName() + "(" + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ");", existingMapperClass);
                         method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("List<" + dtoClass.getName() + ">" + " to" + dtoClass.getName() + "(List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ");", existingMapperClass);
+                    } else if (Objects.requireNonNull(dtoClass.getName()).contains("PutDTO")) {
+                        method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText(entityClass.getName() + " from" + dtoClass.getName() + "(@MappingTarget " + entityClass.getName() + " " + lowercaseFirstLetter(entityClass.getName()) + ", " + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
+                        method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("List<" + entityClass.getName() + ">" + " to" + dtoClass.getName() + "(@MappingTarget  List<" + entityClass.getName() + "> " + lowercaseFirstLetter(entityClass.getName()) + ", List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                     } else {
                         method1 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText(entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
                         method2 = JavaPsiFacade.getElementFactory(entityClass.getProject()).createMethodFromText("List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");", existingMapperClass);
@@ -601,10 +428,6 @@ public class GenerateDtoAction extends AnAction {
 
                     existingMapperClass.add(method1);
                     existingMapperClass.add(method2);
-
-                    // Import the annotations
-                    PsiJavaFile javaFile = (PsiJavaFile) existingMapperClass.getContainingFile();
-                    javaFile.getImportList().add(factory.createImportStatementOnDemand("org.mapstruct"));
                 }
             }
         });
@@ -633,33 +456,33 @@ public class GenerateDtoAction extends AnAction {
     }
 
 
-        // Helper method to determine if a field represents a foreign key
-        private boolean isForeignKey (PsiField field){
-            // This is a basic check based on JPA annotations. Adjust as needed for your project.
-            return Arrays.stream(field.getAnnotations())
-                    .anyMatch(annotation -> annotation.getQualifiedName().equals("jakarta.persistence.ManyToOne") ||
-                            annotation.getQualifiedName().equals("jakarta.persistence.OneToOne") ||
-                            annotation.getQualifiedName().equals("javax.persistence.ManyToOne") ||
-                            annotation.getQualifiedName().equals("javax.persistence.OneToOne"));
-        }
+    // Helper method to determine if a field represents a foreign key
+    private boolean isForeignKey(PsiField field) {
+        // This is a basic check based on JPA annotations. Adjust as needed for your project.
+        return Arrays.stream(field.getAnnotations())
+                .anyMatch(annotation -> annotation.getQualifiedName().equals("jakarta.persistence.ManyToOne") ||
+                        annotation.getQualifiedName().equals("jakarta.persistence.OneToOne") ||
+                        annotation.getQualifiedName().equals("javax.persistence.ManyToOne") ||
+                        annotation.getQualifiedName().equals("javax.persistence.OneToOne"));
+    }
 
 
-        private boolean hasJpaAnnotations (PsiField field){
-            String[] jpaAnnotations = {"jakarta.persistence.Id", "jakarta.persistence.Column",
-                    "jakarta.persistence.ManyToOne", "jakarta.persistence.OneToMany",
-                    "jakarta.persistence.ManyToMany", "jakarta.persistence.OneToOne",
-                    "javax.persistence.Id", "javax.persistence.Column",
-                    "javax.persistence.ManyToOne", "javax.persistence.OneToMany",
-                    "javax.persistence.ManyToMany", "javax.persistence.OneToOne"};
-            for (PsiAnnotation annotation : field.getAnnotations()) {
-                String annotationQualifiedName = annotation.getQualifiedName();
-                for (String jpaAnnotation : jpaAnnotations) {
-                    if (jpaAnnotation.equals(annotationQualifiedName)) {
-                        return true;
-                    }
+    private boolean hasJpaAnnotations(PsiField field) {
+        String[] jpaAnnotations = {"jakarta.persistence.Id", "jakarta.persistence.Column",
+                "jakarta.persistence.ManyToOne", "jakarta.persistence.OneToMany",
+                "jakarta.persistence.ManyToMany", "jakarta.persistence.OneToOne",
+                "javax.persistence.Id", "javax.persistence.Column",
+                "javax.persistence.ManyToOne", "javax.persistence.OneToMany",
+                "javax.persistence.ManyToMany", "javax.persistence.OneToOne"};
+        for (PsiAnnotation annotation : field.getAnnotations()) {
+            String annotationQualifiedName = annotation.getQualifiedName();
+            for (String jpaAnnotation : jpaAnnotations) {
+                if (jpaAnnotation.equals(annotationQualifiedName)) {
+                    return true;
                 }
             }
-            return false;
         }
+        return false;
     }
+}
 

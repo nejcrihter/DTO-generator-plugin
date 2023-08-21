@@ -6,8 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="1bcf9462-f5e7-4f4f-a426-9096261c625f" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/si/dtogenerator/GenerateDtoAction.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/si/dtogenerator/GenerateDtoAction.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,6 +47,11 @@
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2022.3.2/1cb3811df1ebf968ed47d92c8a19dedda3782f45/ideaIC-2022.3.2-sources.jar!/com/intellij/openapi/application/impl/ApplicationImpl.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2022.3.2/1cb3811df1ebf968ed47d92c8a19dedda3782f45/ideaIC-2022.3.2-sources.jar!/com/intellij/openapi/command/WriteCommandAction.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2022.3.2/1cb3811df1ebf968ed47d92c8a19dedda3782f45/ideaIC-2022.3.2-sources.jar!/com/intellij/openapi/command/impl/CoreCommandProcessor.java" root0="SKIP_INSPECTION" />
   </component>
   <component name="LogFilters">
     <option name="FILTER_ERRORS" value="false" />
@@ -114,6 +118,9 @@
       <workItem from="1691752446527" duration="238000" />
       <workItem from="1691752720906" duration="600000" />
       <workItem from="1692161826752" duration="2125000" />
+      <workItem from="1692335405376" duration="132000" />
+      <workItem from="1692335805934" duration="1639000" />
+      <workItem from="1692594011734" duration="3703000" />
     </task>
     <servers />
   </component>
