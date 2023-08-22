@@ -1,14 +1,19 @@
 package si.dtogenerator;
 
 import com.intellij.ide.highlighter.JavaFileType;
+import com.intellij.lang.ImportOptimizer;
+import com.intellij.lang.java.JavaImportOptimizer;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.codeStyle.CodeStyleManager;
+import com.intellij.psi.codeStyle.JavaCodeStyleManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.openapi.project.Project;
 
@@ -35,6 +40,7 @@ public class GenerateDtoAction extends AnAction {
             generatePutDtoForEntity(selectedClass);
             generateUpdateDtoForEntity(selectedClass);
             generateBP(selectedClass);
+            generateDAO(selectedClass);
         }
     }
 
@@ -100,7 +106,7 @@ public class GenerateDtoAction extends AnAction {
         PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
 
         //Get the service.classname directory
-        PsiDirectory classDirectory = getClassDirectory(entityClass, directory);
+        PsiDirectory classDirectory = getServiceClassDirectory(entityClass, directory);
 
         // Check if DTO class already exists
         PsiFile existingFile = classDirectory.findFile(className + ".java");
@@ -112,7 +118,7 @@ public class GenerateDtoAction extends AnAction {
         // Create DTO class
         PsiClass DTOClass = factory.createClass(className);
 
-        // Create a default constructor for ReturnDTO class
+        // Create a default constructor for DTO class
         PsiMethod defaultConstructor = factory.createConstructor();
         DTOClass.add(defaultConstructor);
 
@@ -126,7 +132,7 @@ public class GenerateDtoAction extends AnAction {
                 String fieldName;
                 boolean isNotNull = false;
 
-                if (isUpdate) {
+                if (!isUpdate) {
                     PsiAnnotation columnAnnotation = field.getAnnotation("jakarta.persistence.Column");
                     if (columnAnnotation == null) {
                         columnAnnotation = field.getAnnotation("javax.persistence.Column");
@@ -202,6 +208,9 @@ public class GenerateDtoAction extends AnAction {
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.validation.constraints"));
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.validation.constraints"));
 
+        JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(javaFile.getProject());
+        styleManager.optimizeImports(javaFile);
+
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
             // Add ReturnDTO class to the same directory as the entity
@@ -216,24 +225,24 @@ public class GenerateDtoAction extends AnAction {
 
         PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
 
-        //Get the service.classname directory
-        PsiDirectory classDirectory = getBPClassDirectory(entityClass, directory);
+        //Get the beanParams directory
+        PsiDirectory classDirectory = getClassDirectory(entityClass, directory, "beanParams");
 
         String className = entityClass.getName() + "BP";
 
-        // Check if DTO class already exists
+        // Check if BP class already exists
         PsiFile existingFile = classDirectory.findFile(className + ".java");
         if (existingFile != null) {
             System.out.println(className + " already exists");
             return; // Exit the method if DTO class already exists
         }
 
-        // Create DTO class
-        PsiClass DTOClass = factory.createClass(className);
+        // Create BP class
+        PsiClass BPClass = factory.createClass(className);
 
-        // Create a default constructor for ReturnDTO class
+        // Create a default constructor for BP class
         PsiMethod defaultConstructor = factory.createConstructor();
-        DTOClass.add(defaultConstructor);
+        BPClass.add(defaultConstructor);
 
         // Create a StringBuilder to hold the constructor parameters and body
         StringBuilder constructorParams = new StringBuilder();
@@ -253,12 +262,12 @@ public class GenerateDtoAction extends AnAction {
                     fieldName = field.getName();
                 }
 
-                // Add field to DTO class with annotations
+                // Add field to BP class with annotations
                 PsiField newField = factory.createField(fieldName, fieldType);
 
                 newField.getModifierList().addAnnotation("QueryParam(\"" + fieldName + "\")");
 
-                DTOClass.add(newField);
+                BPClass.add(newField);
 
                 // Add parameter to constructor
                 if (constructorParams.length() > 0) {
@@ -274,40 +283,163 @@ public class GenerateDtoAction extends AnAction {
                 PsiMethod getter = factory.createMethodFromText(
                         "public " + fieldType.getPresentableText() + " get" +
                                 Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
-                                "() { return " + fieldName + "; }", DTOClass);
-                DTOClass.add(getter);
+                                "() { return " + fieldName + "; }", BPClass);
+                BPClass.add(getter);
 
                 // Add setter for the field
                 PsiMethod setter = factory.createMethodFromText(
                         "public void set" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) +
                                 "(" + fieldType.getPresentableText() + " " + fieldName + ") { this." +
-                                fieldName + " = " + fieldName + "; }", DTOClass);
-                DTOClass.add(setter);
+                                fieldName + " = " + fieldName + "; }", BPClass);
+                BPClass.add(setter);
             }
         }
 
-        // Create and add constructor with parameters to DTO class
+        // Create and add constructor with parameters to BP class
         PsiMethod constructor = factory.createMethodFromText(
-                "public " + DTOClass.getName() + "(" + constructorParams.toString() + ") { " +
+                "public " + BPClass.getName() + "(" + constructorParams.toString() + ") { " +
                         constructorBody.toString() +
-                        " }", DTOClass);
-        DTOClass.add(constructor);
+                        " }", BPClass);
+        BPClass.add(constructor);
 
         // Import the annotations
-        PsiJavaFile javaFile = (PsiJavaFile) DTOClass.getContainingFile();
+        PsiJavaFile javaFile = (PsiJavaFile) BPClass.getContainingFile();
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.ws.rs"));
         Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.ws.rs"));
 
+        JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(javaFile.getProject());
+        styleManager.optimizeImports(javaFile);
+
         // Use WriteCommandAction to make modifications
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
-            // Add ReturnDTO class to the same directory as the entity
-            classDirectory.add(DTOClass);
+            // Add BP class to the same directory as the entity
+            classDirectory.add(BPClass);
         });
-        // Create mapper directory and MapStruct mapper
-        createMapperForEntity(entityClass, DTOClass);
     }
 
-    private static PsiDirectory getClassDirectory(PsiClass entityClass, PsiDirectory directory) {
+    private void generateDAO(PsiClass entityClass) {
+        PsiElementFactory factory = JavaPsiFacade.getInstance(entityClass.getProject()).getElementFactory();
+
+        PsiDirectory directory = entityClass.getContainingFile().getContainingDirectory();
+
+        //Get the DAO directory
+        PsiDirectory classDirectory = getClassDirectory(entityClass, directory, "DAO");
+
+        String className = entityClass.getName() + "DAO";
+
+        // Check if DAO class already exists
+        PsiFile existingFile = classDirectory.findFile(className + ".java");
+        if (existingFile != null) {
+            System.out.println(className + " already exists");
+            return; // Exit the method if DTO class already exists
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("\n\n@RequestScoped\n");
+        sb.append("public class ").append(className).append(" extends PetrolGenericDAO<")
+                .append(entityClass.getName()).append("> {\n\n");
+
+        // Generate listAll method
+        generateListMethod(sb, entityClass, "List<" + entityClass.getName() + ">", "getResultList", "listAll");
+
+        // Generate listCountAll method
+        generateListMethod(sb, entityClass, "Long", "getSingleResult", "listAllCount");
+
+        // Close class
+        sb.append("}\n");
+
+        // Use WriteCommandAction to make modifications
+        WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
+            PsiFileFactory fileFactory = PsiFileFactory.getInstance(entityClass.getProject());
+            PsiFile DAOFile = fileFactory.createFileFromText(className + ".java", JavaFileType.INSTANCE, sb);
+
+            // Import the annotations
+            PsiJavaFile javaFile = (PsiJavaFile) DAOFile.getContainingFile();
+            if (isQuarkus3Project(entityClass.getProject())) {
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.persistence.criteria"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.persistence"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.enterprise.context"));
+            }
+            else {
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.persistence.criteria"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.persistence"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.enterprise.context"));
+            }
+            Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.beanParams"));
+            Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.entity"));
+            Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("java.util"));
+
+            JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(DAOFile.getProject());
+            styleManager.optimizeImports(DAOFile);
+
+            classDirectory.add(DAOFile);
+
+        });
+
+
+    }
+
+    private void generateListMethod(StringBuilder sb, PsiClass entityClass, String returnType, String queryMethod, String methodName) {
+        sb.append("    public ").append(returnType).append(" ").append(methodName).append("(")
+                .append(entityClass.getName()).append("BP ").append(lowercaseFirstLetter(entityClass.getName())).append("BP");
+
+        String queryClass;
+        String[] queryClasses = returnType.split("<");
+        if (queryClasses.length > 1) {
+            queryClass = queryClasses[1].substring(0, queryClasses[1].length() - 1);
+        } else {
+            queryClass = returnType;
+        }
+
+        // Add FK parameters from the entity
+        for (PsiField field : entityClass.getFields()) {
+            if (hasJpaAnnotations(field)) {
+                if (isForeignKey(field)) {
+                    sb.append(", ").append(field.getType().getPresentableText()).append(" ").append(field.getName());
+                }
+            }
+        }
+
+        sb.append(") {\n");
+        sb.append("        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();\n");
+        sb.append("        CriteriaQuery<").append(queryClass).append("> cq = cb.createQuery(")
+                .append(queryClass).append(".class);\n");
+        sb.append("        Root<").append(entityClass.getName()).append("> root = cq.from(")
+                .append(entityClass.getName()).append(".class);\n\n");
+
+        // Add predicates for FKs
+        sb.append("        List<Predicate> predicates = new ArrayList<>();\n");
+        for (PsiField field : entityClass.getFields()) {
+            if (hasJpaAnnotations(field)) {
+                String fieldName;
+
+                if (isForeignKey(field)) {
+                    fieldName = field.getName() + "Id";
+                    sb.append("        if (Objects.nonNull(").append(fieldName).append(")) {\n");
+                    sb.append("            predicates.add(cb.equal(root.get(").append(entityClass.getName())
+                            .append("_.").append(separateByUpperCaseAndAddUnderline(fieldName).toUpperCase()).append("), ")
+                            .append(fieldName).append("));\n");
+                    sb.append("        }\n");
+
+                } else {
+                    sb.append("        if (Objects.nonNull(").append(lowercaseFirstLetter(entityClass.getName())).append("BP.get").append(uppercaseFirstLetter(field.getName())).append("())) {\n");
+                    sb.append("            predicates.add(cb.equal(root.get(").append(entityClass.getName())
+                            .append("_.").append(separateByUpperCaseAndAddUnderline(field.getName()).toUpperCase()).append("), ")
+                            .append(lowercaseFirstLetter(entityClass.getName())).append("BP.get").append(uppercaseFirstLetter(field.getName())).append("()));\n");
+                    sb.append("        }\n");
+                }
+            }
+        }
+
+        sb.append("\n        cq.where(predicates.toArray(new Predicate[0]));\n");
+        sb.append("        TypedQuery<").append(queryClass).append("> query = getEntityManager().createQuery(cq);\n\n");
+        sb.append("        return query.").append(queryMethod).append("();\n");
+        sb.append("    }\n");
+    }
+
+
+    private PsiDirectory getServiceClassDirectory(PsiClass entityClass, PsiDirectory directory) {
         // Get the parent directory
         PsiDirectory parentDirectory = directory.getParent();
 
@@ -331,7 +463,7 @@ public class GenerateDtoAction extends AnAction {
         return classDirectory[0];
     }
 
-    private static PsiDirectory getBPClassDirectory(PsiClass entityClass, PsiDirectory directory) {
+    private PsiDirectory getClassDirectory(PsiClass entityClass, PsiDirectory directory, String subdirectoryName) {
         // Get the parent directory
         PsiDirectory parentDirectory = directory.getParent();
 
@@ -341,9 +473,9 @@ public class GenerateDtoAction extends AnAction {
         WriteCommandAction.runWriteCommandAction(entityClass.getProject(), () -> {
             // Check if the parent directory has a subdirectory named service.classname
             if (parentDirectory != null) {
-                PsiDirectory serviceDirectory = parentDirectory.findSubdirectory("beanParams");
+                PsiDirectory serviceDirectory = parentDirectory.findSubdirectory(subdirectoryName);
                 if (serviceDirectory == null) {
-                    serviceDirectory = parentDirectory.createSubdirectory("beanParams");
+                    serviceDirectory = parentDirectory.createSubdirectory(subdirectoryName);
                 }
                 classDirectory[0] = serviceDirectory;
             }
@@ -352,11 +484,33 @@ public class GenerateDtoAction extends AnAction {
         return classDirectory[0];
     }
 
-    public static String lowercaseFirstLetter(String str) {
+    private String lowercaseFirstLetter(String str) {
         if (str == null || str.isEmpty()) {
             return str; // return the original string if it's null or empty
         }
         return Character.toLowerCase(str.charAt(0)) + str.substring(1);
+    }
+
+    private String uppercaseFirstLetter(String str) {
+        if (str == null || str.isEmpty()) {
+            return str; // return the original string if it's null or empty
+        }
+        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+    }
+
+    private String separateByUpperCaseAndAddUnderline(String input) {
+        String result = "";
+        int start = 0;
+        for (int i = 1; i < input.length(); i++) {
+            if (Character.isUpperCase(input.charAt(i))) {
+                result += input.substring(start, i);
+                result += "_";
+                start = i;
+            }
+        }
+        result += (input.substring(start));
+
+        return result;
     }
 
 
@@ -382,19 +536,27 @@ public class GenerateDtoAction extends AnAction {
             String mappingMethods = "    " + entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n" +
                     "    List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");";
 
-            boolean isQuarkus2 = isQuarkus2Project(entityClass.getProject());
-            String componentModel = isQuarkus2 ? "cdi" : "jakarta";
+            boolean isQuarkus3 = isQuarkus3Project(entityClass.getProject());
+            String componentModel = isQuarkus3 ? "jakarta" : "cdi";
 
             if (existingMapper == null) {
-                String mapperText = "import org.mapstruct.*;\n" +
-                        "import java.util.List;" +
-                        "@Mapper(componentModel = \"" + componentModel + "\")\n" +
+                String mapperText = "@Mapper(componentModel = \"" + componentModel + "\")\n" +
                         "public interface " + mapperName + " {\n" +
                         mappingMethods +
                         "}";
 
                 PsiFileFactory fileFactory = PsiFileFactory.getInstance(entityClass.getProject());
                 PsiFile mapperFile = fileFactory.createFileFromText(mapperName + ".java", JavaFileType.INSTANCE, mapperText);
+
+                // Import the annotations
+                PsiJavaFile javaFile = (PsiJavaFile) mapperFile.getContainingFile();
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.service"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.entity"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("java.util"));
+                Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("org.mapstruct"));
+
+                JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(mapperFile.getProject());
+                styleManager.optimizeImports(mapperFile);
 
                 mapperDirectory.add(mapperFile);
 
@@ -423,12 +585,30 @@ public class GenerateDtoAction extends AnAction {
 
                     existingMapperClass.add(method1);
                     existingMapperClass.add(method2);
+
+                    // Import the annotations
+                    PsiJavaFile javaFile = (PsiJavaFile) existingMapperClass.getContainingFile();
+                    Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.service." + Objects.requireNonNull(entityClass.getName()).toLowerCase()));
+                    Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.entity"));
+                    Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("java.util"));
+                    Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("org.mapstruct"));
+
+                    JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(existingMapperClass.getProject());
+                    styleManager.optimizeImports(existingMapperClass.getContainingFile());
+
+                    // Commit the changes
+                    PsiDocumentManager documentManager = PsiDocumentManager.getInstance(existingMapperClass.getProject());
+                    PsiFile psiFile = existingMapperClass.getContainingFile();
+                    Document document = documentManager.getDocument(psiFile);
+                    if (document != null) {
+                        documentManager.commitDocument(document);
+                    }
                 }
             }
         });
     }
 
-    private boolean isQuarkus2Project(Project project) {
+    private boolean isQuarkus3Project(Project project) {
         VirtualFile baseDir = ProjectUtil.guessProjectDir(project);
         if (baseDir != null) {
             VirtualFile pomFile = baseDir.findChild("pom.xml");
@@ -439,7 +619,7 @@ public class GenerateDtoAction extends AnAction {
                     Matcher matcher = pattern.matcher(pomContent);
                     if (matcher.find()) {
                         String quarkusVersion = matcher.group(1);
-                        return quarkusVersion.startsWith("2.");
+                        return quarkusVersion.startsWith("3.");
                     }
                 } catch (Exception e) {
                     // Handle any exceptions that might occur while reading the pom.xml
