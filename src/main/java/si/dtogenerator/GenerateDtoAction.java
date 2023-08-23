@@ -368,6 +368,7 @@ public class GenerateDtoAction extends AnAction {
             }
             Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.beanParams"));
             Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.entity"));
+            Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("si.petrol.entity.notes"));
             Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("java.util"));
 
             JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(DAOFile.getProject());
@@ -412,14 +413,12 @@ public class GenerateDtoAction extends AnAction {
         sb.append("        List<Predicate> predicates = new ArrayList<>();\n");
         for (PsiField field : entityClass.getFields()) {
             if (hasJpaAnnotations(field)) {
-                String fieldName;
 
                 if (isForeignKey(field)) {
-                    fieldName = field.getName() + "Id";
-                    sb.append("        if (Objects.nonNull(").append(fieldName).append(")) {\n");
+                    sb.append("        if (Objects.nonNull(").append(field.getName()).append(")) {\n");
                     sb.append("            predicates.add(cb.equal(root.get(").append(entityClass.getName())
-                            .append("_.").append(separateByUpperCaseAndAddUnderline(fieldName).toUpperCase()).append("), ")
-                            .append(fieldName).append("));\n");
+                            .append("_.").append(separateByUpperCaseAndAddUnderline(field.getName()).toUpperCase()).append("), ")
+                            .append(field.getName()).append("));\n");
                     sb.append("        }\n");
 
                 } else {
