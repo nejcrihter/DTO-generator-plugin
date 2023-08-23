@@ -240,6 +240,11 @@ public class GenerateDtoAction extends AnAction {
         // Create BP class
         PsiClass BPClass = factory.createClass(className);
 
+        // Make BP class extend Paging
+        PsiClassType pagingType = factory.createTypeByFQClassName("PagingBP", entityClass.getResolveScope());
+        Objects.requireNonNull(BPClass.getExtendsList()).add(factory.createReferenceElementByType(pagingType));
+
+
         // Create a default constructor for BP class
         PsiMethod defaultConstructor = factory.createConstructor();
         BPClass.add(defaultConstructor);
@@ -360,8 +365,7 @@ public class GenerateDtoAction extends AnAction {
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.persistence.criteria"));
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.persistence"));
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("jakarta.enterprise.context"));
-            }
-            else {
+            } else {
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.persistence.criteria"));
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.persistence"));
                 Objects.requireNonNull(javaFile.getImportList()).add(factory.createImportStatementOnDemand("javax.enterprise.context"));
@@ -409,6 +413,7 @@ public class GenerateDtoAction extends AnAction {
         sb.append("        Root<").append(entityClass.getName()).append("> root = cq.from(")
                 .append(entityClass.getName()).append(".class);\n\n");
 
+
         // Add predicates for FKs
         sb.append("        List<Predicate> predicates = new ArrayList<>();\n");
         for (PsiField field : entityClass.getFields()) {
@@ -432,8 +437,18 @@ public class GenerateDtoAction extends AnAction {
         }
 
         sb.append("\n        cq.where(predicates.toArray(new Predicate[0]));\n");
-        sb.append("        TypedQuery<").append(queryClass).append("> query = getEntityManager().createQuery(cq);\n\n");
-        sb.append("        return query.").append(queryMethod).append("();\n");
+        if (queryMethod.equals("getSingleResult")) {
+            sb.append("        TypedQuery<").append(queryClass).append("> query = getEntityManager().createQuery(cq);\n\n");
+            sb.append("        return query.").append(queryMethod).append("();\n");
+        } else {
+            sb.append("\n        int pageSize = ").append(lowercaseFirstLetter(entityClass.getName())).append("BP.getPageSize();\n");
+            sb.append("        int pageNumber = ").append(lowercaseFirstLetter(entityClass.getName())).append("BP.getPageNumber();\n\n");
+            sb.append("        cq.orderBy(prepareOrderList(").append(lowercaseFirstLetter(entityClass.getName())).append("BP, cb, root));\n");
+            sb.append("        TypedQuery<").append(queryClass).append("> query = getEntityManager().createQuery(cq);\n\n");
+            sb.append("        query.setMaxResults(pageSize);\n");
+            sb.append("        query.setFirstResult(pageSize * (pageNumber - 1));\n\n");
+            sb.append("        return query.").append(queryMethod).append("();\n");
+        }
         sb.append("    }\n");
     }
 
@@ -532,7 +547,7 @@ public class GenerateDtoAction extends AnAction {
 
             String mapperName = entityClass.getName() + "Mapper";
             PsiFile existingMapper = mapperDirectory.findFile(mapperName + ".java");
-            String mappingMethods = "    " + entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n" +
+            String mappingMethods = "    " + entityClass.getName() + " from" + dtoClass.getName() + "(" + dtoClass.getName() + " " + lowercaseFirstLetter(dtoClass.getName()) + ");\n\n" +
                     "    List<" + entityClass.getName() + ">" + " from" + dtoClass.getName() + "(List<" + dtoClass.getName() + "> " + lowercaseFirstLetter(dtoClass.getName()) + ");";
 
             boolean isQuarkus3 = isQuarkus3Project(entityClass.getProject());
